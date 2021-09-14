@@ -11,7 +11,7 @@ CURRENTFOLDER = os.path.dirname(__file__)
 from errorCheckTool.qt_util import *
 from maya import cmds
 
-__VERSION__ = "3.0.20210518"
+__VERSION__ = "3.0.20210914"
 
 
 class InstallWindow(QDialog):

@@ -94,7 +94,7 @@ print("succesfully copied files")
 print("changed debug to release")
 
 # using 7z in this case as its smaller in comparrision to zip
-subprocess.call(['7z', 'a', os.path.join(baseFolder, "ErrorCheckTool_%s.7z" % _vers), os.path.join(baseFolder, "curveCreator")])
+subprocess.call(['7z', 'a', os.path.join(baseFolder, "ErrorCheckTool_%s.7z" % _vers), os.path.join(baseFolder, "errorCheckTool")])
 subprocess.call(['7z', 'a', os.path.join(baseFolder, "ErrorCheckTool_%s.7z" % _vers), _baseINI])
 subprocess.call(['7z', 'a', os.path.join(baseFolder, "ErrorCheckTool_%s.7z" % _vers), os.path.join(baseFolder, "dragDropInstall.mel")])
 subprocess.call(['7z', 'a', os.path.join(baseFolder, "ErrorCheckTool_%s.7z" % _vers), os.path.join(baseFolder, "packageInstaller.py")])

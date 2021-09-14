@@ -8,7 +8,7 @@ from maya import cmds
 from errorCheckTool import mayaWidget
 from errorCheckTool.maya_utils import *
 from messageProgressBar import MessageProgressBar
-__VERSION__ = "2.0.20210914"
+__VERSION__ = "3.0.20210914"
 _DIR = os.path.dirname(__file__)
 
 
