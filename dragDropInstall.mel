@@ -1,0 +1,23 @@
+// drag and drop this file on maya window for create shelf button
+global proc findMe(){};
+
+global proc string currentFolder (string $proc_name){
+    string $whatIs=`whatIs $proc_name`;
+    string $fullPath=`substring $whatIs 25 999`;
+    string $buffer[];
+    string $slash="/";
+    if (`gmatch $whatIs "*\\\\*"`)
+    	$slash="\\";
+    int $numTok=`tokenize $fullPath $slash $buffer`;
+    int $numLetters=size($fullPath);
+    int $numLettersLastFolder=size($buffer[$numTok-1]);
+    string $scriptLocation=`substring $fullPath 1 ($numLetters-$numLettersLastFolder)`;
+    return $scriptLocation;
+};
+
+global proc runPythonTools(string $path){
+	python("import sys; sys.path.insert(0,r'"+$path+"'); import packageInstaller;packageInstaller.doFunction(True)");
+};
+
+$place_path=currentFolder("findMe");
+runPythonTools($place_path);

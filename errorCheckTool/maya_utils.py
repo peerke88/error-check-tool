@@ -1,4 +1,4 @@
-from maya import cmds
+from maya import cmds, mel
 from qt_util import *
 
 
@@ -26,8 +26,9 @@ def history_objects(uniqueGeometryList, allShapes, progressBar=None):
                 if not 'groupId' in j and not 'lambert2SG' in j:
                     if not 'initialShadingGroup' in j and not 'doneUV' in j:
                         historyList.append(geo)
-        setProgress(percentage * index, progressBar)
+        setProgress(percentage * index, progressBar, "Checking history: %s" % geo.split('|')[-1])
 
+    setProgress(100, progressBar, "history checked")
     newhistoryList = list(set(historyList))
     return {'history': newhistoryList}
 
@@ -36,7 +37,6 @@ def xforms(uniqueGeometryList, progressBar=None):
      # search for xforms
     totalObjects = len(uniqueGeometryList)
     percentage = 99.0 / totalObjects
-    # self.currentWorkingItem.setText('Xforms')
     xformsList = []
     for index, geo in enumerate(uniqueGeometryList):
         xforms = cmds.xform(geo, q=True, t=True)
@@ -48,7 +48,8 @@ def xforms(uniqueGeometryList, progressBar=None):
         xforms = cmds.xform(geo, q=True, r=True, s=True)
         if not xforms == [1.0, 1.0, 1.0]:
             xformsList.append(geo)
-        setProgress(percentage * index, progressBar)
+        setProgress(percentage * index, progressBar, "checking xforms: %s" % geo.split('|')[-1])
+    setProgress(100, progressBar, "xforms checked")
 
     return {'Xforms': xformsList}
 
@@ -59,7 +60,6 @@ def layers(progressBar=None):
     lockedlayers = []
     totalObjects = len(allLayers)
     percentage = 99.0 / totalObjects
-    # self.currentWorkingItem.setText('Layers')
     for index, layer in enumerate(allLayers):
         try:
             layerQuerystate = cmds.layerButton(i, q=True, ls=True)
@@ -68,7 +68,8 @@ def layers(progressBar=None):
                 lockedlayers.append(i)
         except:
             pass
-        setProgress(percentage * index, progressBar)
+        setProgress(percentage * index, progressBar, "checking layers: %s" % layer)
+    setProgress(100, progressBar, "layers checked")
 
     return {'Locked Layers': lockedlayers}
 
@@ -78,11 +79,11 @@ def hidden_objects(uniqueGeometryList, progressBar=None):
     invisibleList = []
     totalObjects = len(uniqueGeometryList)
     percentage = 99.0 / totalObjects
-    # self.currentWorkingItem.setText('Hidden Objects')
     for index, geo in enumerate(uniqueGeometryList):
         if cmds.getAttr(str(geo) + '.v') == 0:
             invisibleList.append(geo)
-        setProgress(percentage * index, progressBar)
+        setProgress(percentage * index, progressBar, "checking hidden: %s" % geo.split('|')[-1])
+    setProgress(100, progressBar, "hidden objects checked")
 
     return {'Hidden objects': invisibleList}
 
@@ -91,31 +92,31 @@ def default_and_pasted_objects(uniqueGeometryList, progressBar=None):
     namedList = []
     totalObjects = len(uniqueGeometryList)
     percentage = 99.0 / totalObjects
-    # self.currentWorkingItem.setText('Default and Pasted')
     for index, geo in enumerate(uniqueGeometryList):
         geo = geo.split('|')[-1]
         if any(x in geo for x in ['pCube', 'polySurface', 'pCylinder',
                                   'pSphere', 'pCone', 'pPlane', 'pTorus',
                                   'pPyramid', 'pPipe', '__Pasted']):
             namedList.append(geo)
-        setProgress(percentage * index, progressBar)
+        setProgress(percentage * index, progressBar, "checking defaults: %s" % geo.split('|')[-1])
+    setProgress(100, progressBar, "defaults checked")
 
     return {'Default and Pasted': namedList}
 
 
 def uniqueNames(progressBar=None):
     # unique naming
-    similarNames = cmds.ls(type="transform")
+    similarNames = cmds.ls(type="transform", l=0)
     nonUnique = []
     totalObjects = len(similarNames)
     percentage = 99.0 / totalObjects
 
-    # self.currentWorkingItem.setText('Unique Names')
-    for index, object in enumerate(similarNames):
-        longname = object.split("|")
+    for index, geo in enumerate(similarNames):
+        longname = geo.split("|")
         if len(longname) > 1:
-            nonUnique.append(object)
-        setProgress(percentage * index, progressBar)
+            nonUnique.append(geo)
+        setProgress(percentage * index, progressBar, "checking unique: %s" % geo.split('|')[-1])
+    setProgress(100, progressBar, "unique checked")
 
     return {'Unique Names': nonUnique}
 
@@ -124,15 +125,15 @@ def default_shader(uniqueGeometryList, progressBar=None):
     defaultLambertGrp = []
     totalObjects = len(uniqueGeometryList)
     percentage = 99.0 / totalObjects
-    # self.currentWorkingItem.setText('Default Shaders')
     for index, geo in enumerate(uniqueGeometryList):
-        shaders = cmds.listConnections(cmds.listHistory(i, f=1), type='lambert')
+        shaders = cmds.listConnections(cmds.listHistory(geo, f=1), type='lambert')
 
         if not shaders == None:
-            for j in shaders:
-                if j == 'lambert1':
-                    defaultLambertGrp.append(i)
-        setProgress(percentage * index, progressBar)
+            for shader in shaders:
+                if shader == 'lambert1':
+                    defaultLambertGrp.append(geo)
+        setProgress(percentage * index, progressBar, "checking default shader: %s" % geo.split('|')[-1])
+    setProgress(100, progressBar, "default shader checked")
     return {'Default Shader': defaultLambertGrp}
 
 
@@ -141,22 +142,21 @@ def all_shaders(allCommonShaders, progressBar=None):
     pastedShaders = []
     totalObjects = len(allCommonShaders)
     percentage = 99.0 / totalObjects
-    # self.currentWorkingItem.setText('Pasted Shaders')
     for index, shader in enumerate(allCommonShaders):
         if 'pasted__' in shader:
             pastedShaders.append(shader)
-        setProgress(percentage * index, progressBar)
+        setProgress(percentage * index, progressBar, "checking pasted shaders: %s" % shader)
+    setProgress(100, progressBar, "pasted shaders checked")
 
     return {"Pasted Shaders": pastedShaders}
 
 
 def holes(progressBar=None):
     # find holes
-    setProgress(0, progressBar)
-    # self.currentWorkingItem.setText('Holes')
+    setProgress(0, progressBar, "checking holes")
     FacesWithHoles = mel.eval('polyCleanupArgList 3 { "1","2","0","0","0","0","1","0","0","1e-005","0","1e-005","0","1e-005","0","-1","0" };')
 
-    setProgress(100, progressBar)
+    setProgress(100, progressBar, "holes checked")
     return {'Holes': FacesWithHoles}
 
 
@@ -165,7 +165,6 @@ def locked_normals(uniqueGeometryList, progressBar=None):
     lockedNormals = []
     totalObjects = len(uniqueGeometryList)
     percentage = 99.0 / totalObjects
-    # self.currentWorkingItem.setText('Locked Normals')
     for index, geo in enumerate(uniqueGeometryList):
         try:
             vertices = cmds.filterExpand(cmds.polyListComponentConversion(geo, tv=True), sm=31)
@@ -176,8 +175,8 @@ def locked_normals(uniqueGeometryList, progressBar=None):
         except:
             pass
 
-        setProgress(percentage * index, progressBar)
-
+        setProgress(percentage * index, progressBar, "checking locked normals: %s" % geo.split('|')[-1])
+    setProgress(100, progressBar, "locked normals checked")
     uniqueLockedList = set(lockedNormals)
 
     return {'Locked Normals': list(uniqueLockedList)}
@@ -193,8 +192,7 @@ def ngons(uniqueGeometryList, progressBar):
     totalObjects = len(uniqueGeometryList)
     percentage = 99.0 / totalObjects
 
-    # self.currentWorkingItem.setText('N-Gons')
-    for imdex, geo in enumerate(uniqueGeometryList):
+    for index, geo in enumerate(uniqueGeometryList):
         shapeNode = cmds.listRelatives(geo, ad=True, s=True)
         try:
             if cmds.objectType(shapeNode[0], isType="mesh"):
@@ -214,7 +212,8 @@ def ngons(uniqueGeometryList, progressBar):
                         ngonObj.append(j)
         except:
             pass
-        setProgress(percentage * index, progressBar)
+        setProgress(percentage * index, progressBar, "checking n-gons: %s" % geo.split('|')[-1])
+    setProgress(100, progressBar, "n-gons checked")
 
     return {'N-Gons': ngonObj}
 
@@ -226,7 +225,6 @@ def legal_uvs(uniqueGeometryList, progressBar=None):
     totalObjects = len(uniqueGeometryList)
     percentage = 99.0 / totalObjects
 
-    # self.currentWorkingItem.setText("Legal uv's")
     for index, geo in enumerate(uniqueGeometryList):
         try:
             objectUVs = cmds.filterExpand(cmds.polyListComponentConversion(geo, tuv=True), sm=35)
@@ -236,8 +234,9 @@ def legal_uvs(uniqueGeometryList, progressBar=None):
                     if float(pos) < 0.0 or float(pos) > 1.0:
                         UVList.append(uv)
         except:
-            NoUvList.append(i)
-        setProgress(percentage * index, progressBar)
+            NoUvList.append(geo)
+        setProgress(percentage * index, progressBar, "checking 0-1 UV's: %s" % geo.split('|')[-1])
+    setProgress(100, progressBar, "0-1 UV's checked")
 
     return {"Legal uv's": UVList, "No uv's": NoUvList}
 
@@ -247,12 +246,12 @@ def lamina_faces(uniqueGeometryList, progressBar=None):
     laminaFacesList = []
     totalObjects = len(uniqueGeometryList)
     percentage = 99.0 / totalObjects
-    # self.currentWorkingItem.setText('Lamina Faces')
     for index, geo in enumerate(uniqueGeometryList):
         laminaFaces = cmds.polyInfo(geo, laminaFaces=True)
         if not laminaFaces == None:
             laminaFacesList += laminaFaces
-        setProgress(percentage * index, progressBar)
+        setProgress(percentage * index, progressBar, "checking lamina: %s" % geo.split('|')[-1])
+    setProgress(100, progressBar, "lamina checked")
 
     return {"Lamina Faces": laminaFacesList}
 
@@ -260,31 +259,28 @@ def lamina_faces(uniqueGeometryList, progressBar=None):
 def zero_edge_length(progressBar=None):
     # zero edge lenght
 
-    setProgress(0, progressBar)
-    # self.currentWorkingItem.setText('Zero Edge Length')
+    setProgress(0, progressBar, "checking zero edge")
     zeroEdgeLenght = mel.eval('polyCleanupArgList 3 { "1","2","0","0","0","0","0","0","0","1e-005","1","1e-005","0","1e-005","0","-1","0" };')
 
-    setProgress(100, progressBar)
+    setProgress(100, progressBar, "zero edge checked")
     return {'Zero Edge Length': zeroEdgeLenght}
 
 
 def zero_geometry_area(progressBar=None):
     # zero geometry area
-    setProgress(0, progressBar)
-    # self.currentWorkingItem.setText('Zero Face Length')
+    setProgress(0, progressBar, "checking zero face")
     zerofaceLenght = mel.eval('polyCleanupArgList 3 { "1","2","0","0","0","0","0","0","1","1e-005","0","1e-005","0","1e-005","0","-1","0" };')
 
-    setProgress(100, progressBar)
+    setProgress(100, progressBar, "zero face checked")
     return {'Zero Face Length': zerofaceLenght}
 
 
 def unmapped_faces(progressBar=None):
     # unmapped faces
-    setProgress(0, progressBar)
-    # self.currentWorkingItem.setText('Zero Map Area')
+    setProgress(0, progressBar, "checking unmapped")
     zeromaparea = mel.eval('polyCleanupArgList 3 { "1","2","0","0","0","0","0","0","0","1e-005","0","1e-005","0","1e-005","0","-1","0" };')
 
-    setProgress(100, progressBar)
+    setProgress(100, progressBar, "unmapped checked")
     return {'Zero Map Area': zeromaparea}
 
 
@@ -294,14 +290,16 @@ def concave_faces(progressBar=None):
     ngons = mel.eval('polyCleanupArgList 3 { "1","2","0","0","1","0","0","0","0","1e-005","0","1e-005","0","1e-005","0","-1","0" };')
     concaveNotNgon = []
     totalObjects = len(concave)
+    if totalObjects == 0:
+        setProgress(100, progressBar, "checked concave")
+        return {'Concave Faces': concaveNotNgon}
     percentage = 99.0 / totalObjects
 
-    # self.currentWorkingItem.setText('Concave Faces')
     for index, geo in enumerate(concave):
         if not i in ngons:
             concaveNotNgon.append(i)
-        setProgress(percentage * index, progressBar)
-
+        setProgress(percentage * index, progressBar, "checking concave: %s" % geo.split('|')[-1])
+    setProgress(100, progressBar, "checked concave")
     return {'Concave Faces': concaveNotNgon}
 
 
@@ -311,7 +309,6 @@ def keyed_objects(uniqueGeometryList, progressBar=None):
     totalObjects = len(uniqueGeometryList)
     percentage = 99.0 / totalObjects
 
-    # self.currentWorkingItem.setText('Keyed Objects')
     for index, geo in enumerate(uniqueGeometryList):
         translatekey = cmds.keyframe(geo, query=True, at='translate', timeChange=True)
         rotatekey = cmds.keyframe(geo, query=True, at='rotate', timeChange=True)
@@ -322,28 +319,27 @@ def keyed_objects(uniqueGeometryList, progressBar=None):
             objectWithKeys.append(geo)
         elif not scalekey == None:
             objectWithKeys.append(geo)
-        setProgress(percentage * index, progressBar)
+        setProgress(percentage * index, progressBar, "checking keys: %s" % geo.split('|')[-1])
+    setProgress(100, progressBar, "checked keys")
 
     return {'Keyed Objects': objectWithKeys}
 
 
 def constraints(progressBar=None):
     # constraints
-    setProgress(0, progressBar)
-    # self.currentWorkingItem.setText('Constraints')
+    setProgress(0, progressBar, "checking constraints")
     constraints = cmds.ls(type="constraint")
 
-    setProgress(100, progressBar)
+    setProgress(100, progressBar, "constraints checked")
     return {'Constraints': constraints}
 
 
 def expressions(progressBar=None):
      # expressions
-    setProgress(0, progressBar)
-    # self.currentWorkingItem.setText('Expressions')
+    setProgress(0, progressBar, "checking expressions")
     expressions = cmds.ls(type="expression")
 
-    setProgress(100, progressBar)
+    setProgress(100, progressBar, "expressions checked")
     return {'Expressions': expressions}
 
 
@@ -357,7 +353,6 @@ def triangulation_percentage(uniqueGeometryList, progressBar=None):
     totalObjects = len(uniqueGeometryList)
     percentage = 99.0 / totalObjects
 
-    # self.currentWorkingItem.setText('Triangulation')
     for index, geo in enumerate(uniqueGeometryList):
         shapeNode = cmds.listRelatives(geo, ad=True, s=True)
         try:
@@ -378,9 +373,12 @@ def triangulation_percentage(uniqueGeometryList, progressBar=None):
                         ngonObj.append(i)
         except:
             pass
-        setProgress(percentage * index, progressBar)
+        setProgress(percentage * index, progressBar, "checking triangulation: %s" % geo.split('|')[-1])
+    setProgress(100, progressBar, "checked triangulation")
 
-    return '%.2f' % ((float(triangles) / float(faces)) * 100) + ' %'
+    if 0 in [faces, triangles]:
+        return {"tri": "0.00 %"}
+    return {"tri": '%.2f' % ((float(triangles) / float(faces)) * 100) + ' %'}
 
 
 def scene_size_position(uniqueGeometryList, boundingbox=False, averagePos=False, progressBar=None):
@@ -394,7 +392,9 @@ def scene_size_position(uniqueGeometryList, boundingbox=False, averagePos=False,
     totalObjects = len(uniqueGeometryList)
     percentage = 99.0 / totalObjects
     _retInfo = {}
-    # self.currentWorkingItem.setText('BBOX and Pos')
+    _text = "boundingBox"
+    if averagePos:
+        _text = "average"
     for index, geo in enumerate(uniqueGeometryList):
         bbox = cmds.exactWorldBoundingBox(geo)
         if bbox[0] < w1:
@@ -409,7 +409,7 @@ def scene_size_position(uniqueGeometryList, boundingbox=False, averagePos=False,
             h2 = bbox[4]
         if bbox[5] > d2:
             d2 = bbox[5]
-        setProgress(percentage * index, progressBar)
+        setProgress(percentage * index, progressBar, "checking %s: %s" % (_text, geo.split('|')[-1]))
 
     if boundingbox == True:
         _retInfo["bbox"] = ['%.2f' % (abs(w1) + abs(w2)), '%.2f' % (abs(h1) + abs(h2)), '%.2f' % (abs(d1) + abs(d2))]
@@ -419,15 +419,16 @@ def scene_size_position(uniqueGeometryList, boundingbox=False, averagePos=False,
         centerPosz = (d1 + d2) / 2
 
         _retInfo["avg"] = ['%.2f' % (centerPosx), '%.2f' % (centerPosz)]
+    setProgress(100, progressBar, "checked %s" % _text)
+
     return _retInfo
 
 
 def resolution_gate(progressBar=None):
     # render resolution
-    setProgress(0, progressBar)
-    # self.currentWorkingItem.setText('Resolution')
+    setProgress(0, progressBar, "checking render resulution")
     wdth = cmds.getAttr("defaultResolution.width")
     hght = cmds.getAttr("defaultResolution.height")
 
-    return {"res", [wdth, hght]}
-    setProgress(100, progressBar)
+    setProgress(100, progressBar, "render resulution checked")
+    return {"res": [wdth, hght]}

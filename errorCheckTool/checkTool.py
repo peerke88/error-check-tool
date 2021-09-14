@@ -7,19 +7,19 @@ from maya import cmds
 
 from errorCheckTool import mayaWidget
 from errorCheckTool.maya_utils import *
-
+from messageProgressBar import MessageProgressBar
 __VERSION__ = "2.0.20210914"
 _DIR = os.path.dirname(__file__)
 
 
 class ErrorCheckUI(mayaWidget.DockWidget):
 
-    toolName = 'Check Tool: %s' % __VERSION__
+    toolName = 'Error Check Tool: %s' % __VERSION__
 
     def __init__(self, newPlacement=False, parent=None):
         super(ErrorCheckUI, self).__init__(parent)
 
-        self.setWindowIcon(QIcon(":/commandButton.png"))
+        self.setWindowIcon(QIcon(os.path.join(_DIR, "icons", "perryToolLogo.png")))
         self.setWindowTitle(self.__class__.toolName)
 
         mainLayout = nullVBoxLayout()
@@ -28,6 +28,7 @@ class ErrorCheckUI(mayaWidget.DockWidget):
         self.__defaults()
         self.__uiElements()
         self.addSearchFunctions()
+        self.addErrorFunctions()
 
         if not newPlacement:
             self.loadUIState()
@@ -35,10 +36,7 @@ class ErrorCheckUI(mayaWidget.DockWidget):
     def __defaults(self):
         _ini = os.path.join(_DIR, 'settings.ini')
         self.settings = QSettings(_ini, QSettings.IniFormat)
-        self.buildInfo = {}
-        self.uniqueGeometryList = []
-        self.allShapes = []
-        self.allCommonShaders = []
+
         self.searchFunctions = OrderedDict()
         self.searchFunctions["Basic"] = ["History", "xForms"]
         self.searchFunctions["Layout"] = ["layers", "Hidden Objects"]
@@ -54,7 +52,7 @@ class ErrorCheckUI(mayaWidget.DockWidget):
         # --- top
         topLayout = nullHBoxLayout()
         topLayout.addItem(QSpacerItem(2, 2, QSizePolicy.Expanding, QSizePolicy.Minimum))
-        _toolIcon = toolButton(os.path.join(_DIR, "perryToolLogo.png"), size=40)
+        _toolIcon = toolButton(os.path.join(_DIR, "icons", "perryToolLogo.png"), size=40)
         topLayout.addWidget(_toolIcon)
         topLayout.addItem(QSpacerItem(2, 2, QSizePolicy.Expanding, QSizePolicy.Minimum))
 
@@ -76,10 +74,50 @@ class ErrorCheckUI(mayaWidget.DockWidget):
         # --- progress and execute
         exLayout = nullHBoxLayout()
         self.exButton = QPushButton("Check current scene")
-        self._progressBar = QProgressBar()
-        for w in [self.exButton, self._progressBar]:
+        self.exButton.clicked.connect(self.checkScene)
+        self._detailProgressBar = MessageProgressBar()
+        self._globalProgressBar = MessageProgressBar()
+        for w in [self.exButton, self._detailProgressBar, self._globalProgressBar]:
             exLayout.addWidget(w)
         self.layout().addLayout(exLayout)
+
+    def addErrorFunctions(self):
+        selectLayout = nullHBoxLayout()
+        rb1 = QRadioButton("single", self)
+        rb2 = QRadioButton("multi", self)
+
+        self.errorTree = QTreeWidget()
+        self.errorTree.setHeaderHidden(True)
+        self.errorTree.itemSelectionChanged.connect(self.handleChanged)
+
+        for rb in [rb1, rb2]:
+            rb.toggled.connect(self.setSelectionMode)
+            selectLayout.addWidget(rb)
+
+        self.errorList.layout().addLayout(selectLayout)
+        self.errorList.layout().addWidget(self.errorTree)
+
+        self._extraGrpBox = QGroupBox()
+        self.errorList.layout().addWidget(self._extraGrpBox)
+        rb2.setChecked(True)
+
+    def setSelectionMode(self, *args):
+        if self.sender().text().lower() == "multi":
+            self.errorTree.setSelectionMode(QAbstractItemView.ExtendedSelection)
+            return
+        self.errorTree.setSelectionMode(QAbstractItemView.SingleSelection)
+
+    def handleChanged(self, *args):
+        items = []
+        allSelected = self.errorTree.selectedItems()
+        if allSelected != []:
+            for item in allSelected:
+                if str(item.toolTip(0)) != 'emptyData':
+                    items.append(str(item.toolTip(0)))
+            if len(items) == 0:
+                cmds.select(cl=True)
+            else:
+                cmds.select(items)
 
     def addSearchFunctions(self):
         for topic, info in self.searchFunctions.items():
@@ -91,25 +129,106 @@ class ErrorCheckUI(mayaWidget.DockWidget):
             topicGrp.layout().addWidget(QLabel())
             topicGrp.toggled.connect(self.onToggled)
 
-            self.checkConnections[topic] = []
+            # self.checkConnections[topic] = []
             for check in info:
                 _check = QCheckBox(check)
                 _check.setChecked(True)
                 topicGrp.layout().addWidget(_check)
                 self.checkConnections[check] = True
-                _check.toggled.connect(partial(self.toggleConn, check))
+                _check.toggled.connect(partial(self.toggleConn, _check, check))
 
             self.searchGroup.layout().addWidget(topicGrp)
         self.searchGroup.layout().addItem(QSpacerItem(2, 2, QSizePolicy.Minimum, QSizePolicy.Expanding))
 
-    def toggleConn(self, check, *args):
-        self.checkConnections[check] = self.sender().isChecked()
+    def toggleConn(self, sender, check, *args):
+        if self.sender() is not None:
+            sender = self.sender()
+        self.checkConnections[check] = sender.isChecked()
 
     def onToggled(self, on):
         # hacky override to make sure everything in the groupbox is not disabled on click
         for box in self.sender().findChildren(QCheckBox):
             box.setChecked(on)
             box.setEnabled(True)
+
+    def checkScene(self):
+        self.errorTree.clear()
+        self.allObjects = cmds.ls(o=True, g=True, l=True)
+        if len(self.allObjects) == 0:
+            cmds.error('no objects in scene!')
+            return
+
+        self.allShapes = cmds.ls(o=True, g=True)
+        self.allCommonShaders = cmds.ls(type=["lambert", "phong", "blinn", "anisotropic", "phongE"])
+        self.allobjectsparents = cmds.listRelatives(self.allObjects, p=True, f=True)
+        self.uniqueGeometryList = set(self.allobjectsparents)
+
+        _functions = {
+            "History": partial(history_objects, self.uniqueGeometryList, self.allShapes, self._detailProgressBar),
+            "xForms": partial(xforms, self.uniqueGeometryList, self._detailProgressBar),
+            "layers": partial(layers, self._detailProgressBar),
+            "Hidden Objects": partial(hidden_objects, self.uniqueGeometryList, self._detailProgressBar),
+            "Default and pasted Objects": partial(default_and_pasted_objects, self.uniqueGeometryList, self._detailProgressBar),
+            "Unigue names": partial(uniqueNames, self._detailProgressBar),
+            "Default and pasted Objects": partial(default_shader, self.uniqueGeometryList, self._detailProgressBar),
+            "Pasted shaders": partial(all_shaders, self.allCommonShaders, self._detailProgressBar),
+            "Holes": partial(holes, self._detailProgressBar),
+            "Locked normals": partial(locked_normals, self.uniqueGeometryList, self._detailProgressBar),
+            "N-gons": partial(ngons, self.uniqueGeometryList, self._detailProgressBar),
+            "Legal UV's": partial(legal_uvs, self.uniqueGeometryList, self._detailProgressBar),
+            "Lamina faces": partial(lamina_faces, self.uniqueGeometryList, self._detailProgressBar),
+            "Zero edge lenght": partial(zero_edge_length, self._detailProgressBar),
+            "Zero geometry data": partial(zero_geometry_area, self._detailProgressBar),
+            "Unmapped faces": partial(unmapped_faces, self._detailProgressBar),
+            "Concave faces": partial(concave_faces, self._detailProgressBar),
+            "Keyed objects": partial(keyed_objects, self.uniqueGeometryList, self._detailProgressBar),
+            "constraints": partial(constraints, self._detailProgressBar),
+            "Expressions": partial(expressions, self._detailProgressBar),
+            "Triangulation percentage": partial(triangulation_percentage, self.uniqueGeometryList, self._detailProgressBar),
+            "Resolution gate": partial(resolution_gate, self._detailProgressBar),
+            "Bounding box": partial(scene_size_position, self.uniqueGeometryList, True, False, self._detailProgressBar),
+            "Average position": partial(scene_size_position, self.uniqueGeometryList, False, True, self._detailProgressBar)
+        }
+
+        amount = sum(self.checkConnections.values())
+        percentage = 99.0 / amount
+
+        for index, (name, toUse) in enumerate(self.checkConnections.items()):
+            if not toUse:
+                continue
+            _dict = _functions[name]()
+            for key, value in _dict.items():
+                if key in ["res", "avg", "bbox", "tri"]:
+                    continue
+                self.createListWidget(value, key)
+            setProgress(index * percentage, self._globalProgressBar, "Processing %s" % name)
+
+        setProgress(100, self._globalProgressBar, "Finished")
+
+    def addParent(self, parent, column, title, data):
+        item = QTreeWidgetItem(parent, [title])
+        item.setData(column, Qt.UserRole, data)
+        item.setChildIndicatorPolicy(QTreeWidgetItem.ShowIndicator)
+        item.setExpanded(False)
+        item.setToolTip(column, data)
+        return item
+
+    def addChild(self, parent, column, title, data):
+        item = QTreeWidgetItem(parent, [title])
+        item.setData(column, Qt.UserRole, data)
+        item.setToolTip(column, data)
+        return item
+
+    def createListWidget(self, inPutList, title):
+        self.CurrentItem = self.addParent(self.errorTree.invisibleRootItem(), 0, title, 'emptyData')
+
+        if inPutList == []:
+            self.addChild(self.CurrentItem, 0, "'empty'", "emptyData")
+            self.CurrentItem.setForeground(0, QBrush(QColor("green")))
+        else:
+            self.CurrentItem.setForeground(0, QBrush(QColor("red")))
+            for object in inPutList:
+                self.addChild(self.CurrentItem, 0, object.split('|')[-1], object)
 
     def saveUIState(self):
         """ save the current state of the ui in a seperate ini file, this should also hold information later from a seperate settings window
@@ -156,46 +275,3 @@ def showUI(newPlacement=False):
     dock = ErrorCheckUI(newPlacement, parent=None)
     dock.run()
     return dock
-
-
-'''
-import sys
-
-sys.path.insert(0,r"\error-check-tool")
-
-toRem = []
-for key in list(sys.modules.keys()):
-    if key.startswith('error'):
-        del sys.modules[key]
-
-from errorCheckTool import checkTool
-_bla = checkTool.showUI()
-'''
-
-# self.searchFunctions = {
-#             "Basic": {"History": partial(history_objects, self.uniqueGeometryList, self.allShapes, self._progressBar),
-#                       "xForms": partial(xforms, self.uniqueGeometryList, self._progressBar)},
-#             "Layout": {"layers": partial(layers, self._progressBar),
-#                        "Hidden Objects": partial(hidden_objects, self.uniqueGeometryList, self._progressBar)},
-#             "Naming": {"Default and pasted Objects": partial(default_and_pasted_objects, self.uniqueGeometryList, self._progressBar),
-#                        "Unigue names": partial(uniqueNames, self._progressBar)},
-#             "Shaders": {"Default and pasted Objects": partial(default_shader, self.uniqueGeometryList, self._progressBar),
-#                         "Pasted shaders": partial(all_shaders, self.allCommonShaders, self._progressBar)},
-#             "Modelling": {"Holes": partial(holes, self._progressBar),
-#                           "Locked normals": partial(locked_normals, self.uniqueGeometryList, self._progressBar),
-#                           "N-gons": partial(ngons, self.uniqueGeometryList, self._progressBar),
-#                           "Legal UV's": partial(legal_uvs, self.uniqueGeometryList, self._progressBar),
-#                           "Lamina faces": partial(lamina_faces, self.uniqueGeometryList, self._progressBar),
-#                           "Zero edge lenght": partial(zero_edge_length, self._progressBar),
-#                           "Zero geometry data": partial(zero_geometry_area, self._progressBar),
-#                           "Unmapped faces": partial(unmapped_faces, self._progressBar),
-#                           "Concave faces": partial(concave_faces, self._progressBar)},
-#             "Channels": {"Keyed objects": partial(keyed_objects, self.uniqueGeometryList, self._progressBar),
-#                          "constraints": partial(constraints, self._progressBar),
-#                          "Expressions": partial(expressions, self._progressBar)},
-#             "Extra": {"Triangulation percentage": partial(triangulation_percentage, self.uniqueGeometryList, self._progressBar),
-#                       "Resolution gate": partial(resolution_gate, self._progressBar),
-#                       "Bounding box": partial(scene_size_position, self.uniqueGeometryList, True, False, self._progressBar),
-#                       "Average position": partial(scene_size_position, self.uniqueGeometryList, False, True, self._progressBar)},
-
-#         }
