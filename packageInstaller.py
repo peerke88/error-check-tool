@@ -11,7 +11,7 @@ CURRENTFOLDER = os.path.dirname(__file__)
 from errorCheckTool.qt_util import *
 from maya import cmds
 
-__VERSION__ = "3.0.20210914"
+__VERSION__ = "3.0.20210916"
 
 
 class InstallWindow(QDialog):
@@ -120,7 +120,7 @@ class InstallWindow(QDialog):
                     setProgress(30, self.progress, "backed up folder as: Backup_%s" % versionDate)
 
         setProgress(50, self.progress, "move error check tool")
-        shutil.move(os.path.normpath(os.path.join(CURRENTFOLDER, "errorCheckTool")), os.path.normpath(os.path.join(self.__scriptDir, "curveCreator")))
+        shutil.move(os.path.normpath(os.path.join(CURRENTFOLDER, "errorCheckTool")), os.path.normpath(os.path.join(self.__scriptDir)))
         if not os.path.exists(os.path.normpath(os.path.join(self.__scriptDir, "__init__.py"))):
             shutil.move(os.path.normpath(os.path.join(CURRENTFOLDER, "__init__.py")), os.path.normpath(os.path.join(self.__scriptDir, "__init__.py")))
         setProgress(100, self.progress, "error check tool installed")

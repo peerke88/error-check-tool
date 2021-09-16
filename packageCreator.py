@@ -82,6 +82,15 @@ for f in toMove:
     copy2(f, dst)
 
 
+def _turnOffDebug():
+    file_path = os.path.join(baseFolder, "dragDropInstall.mel")
+    with fileinput.input(file_path, inplace=True) as f:
+        for line in f:
+            if "packageInstaller.doFunction(True)" in line:
+                line = line.replace("True", "False")
+            print(line, end='')
+
+
 _baseINI = os.path.join(baseFolder, "__init__.py")
 _melInstaller = os.path.join(curFolder, "dragDropInstall.mel")
 _pyInstaller = os.path.join(curFolder, "packageInstaller.py")
@@ -91,6 +100,7 @@ open(_baseINI, 'w').close()
 
 print("succesfully copied files")
 
+_turnOffDebug()
 print("changed debug to release")
 
 # using 7z in this case as its smaller in comparrision to zip

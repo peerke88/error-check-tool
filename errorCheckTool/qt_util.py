@@ -7,6 +7,7 @@ try:
     from PySide.QtCore import *
     from PySide.QtSvg import *
     from PySide import QtGui
+    from PySide.QtCore import Signal as pyqtSignal
     from PySide.QtUiTools import *
     import sip
 
@@ -19,6 +20,7 @@ except Exception as e:
         from PySide2.QtCore import *
         from PySide2.QtWidgets import *
         from PySide2.QtSvg import *
+        from PySide2.QtCore import Signal as pyqtSignal
         from PySide2 import QtGui
         from PySide2.QtUiTools import *
         import shiboken2 as shiboken
@@ -74,6 +76,12 @@ def wrapinstance(ptr, base=None):
         return None
 
 
+def nullLayout(inType, parent=None, size=0):
+    v = inType(parent)
+    v.setContentsMargins(size, size, size, size)
+    return v
+
+
 def nullVBoxLayout(parent=None, size=0):
     """ convenience function for the QVBoxLayout
 
@@ -84,9 +92,7 @@ def nullVBoxLayout(parent=None, size=0):
     :return: the layout
     :rtype: QVBoxLayout
     """
-    v = QVBoxLayout()
-    v.setContentsMargins(size, size, size, size)
-    return v
+    return nullLayout(QVBoxLayout, parent, size)
 
 
 def nullHBoxLayout(parent=None, size=0):
@@ -99,9 +105,7 @@ def nullHBoxLayout(parent=None, size=0):
     :return: the layout
     :rtype: QHBoxLayout
     """
-    h = QHBoxLayout()
-    h.setContentsMargins(size, size, size, size)
-    return h
+    return nullLayout(QHBoxLayout, parent, size)
 
 
 def nullGridLayout(parent=None, size=0):
@@ -114,9 +118,39 @@ def nullGridLayout(parent=None, size=0):
     :return: the layout
     :rtype: QGridLayout
     """
-    h = QGridLayout()
-    h.setContentsMargins(size, size, size, size)
-    return h
+    return QGridLayout(QHBoxLayout, parent, size)
+
+
+def get_maya_window():
+    for widget in QApplication.allWidgets():
+        try:
+            if widget.objectName() == "MayaWindow":
+                return widget
+        except:
+            pass
+    return None
+
+
+def QuickDialog(title):
+    """ convenience Quick dialog for simple accept and reject functions
+
+    :param title: title for the dialog
+    :type title: string
+    :return: the window to be created
+    :rtype: QDialog
+    """
+    myWindow = QDialog()
+    myWindow.setWindowTitle(title)
+    myWindow.setLayout(nullVBoxLayout())
+    h = nullHBoxLayout()
+    myWindow.layout().addLayout(h)
+    btn = pushButton("Accept")
+    btn.clicked.connect(myWindow.accept)
+    h.addWidget(btn)
+    btn = pushButton("Reject")
+    btn.clicked.connect(myWindow.reject)
+    h.addWidget(btn)
+    return myWindow
 
 
 def toolButton(pixmap='', orientation=0, size=None):
@@ -148,6 +182,39 @@ def toolButton(pixmap='', orientation=0, size=None):
             btn.setFixedSize(size)
             btn.setIconSize(size)
     return btn
+
+
+def pushButton(text=''):
+    """ simple button command with correct stylesheet
+
+    :param text: text to add to the button
+    :type text: string
+    :return: the button  
+    :rtype: QPushButton
+    """
+    btn = QPushButton(text)
+    btn.setStyleSheet("background-color: qlineargradient(spread:pad, x1:0, y1:0, x2:1, y2:0, stop:0 #595959, stop:1 #444444);")
+    return btn
+
+
+def buttonsToAttach(name, command, *_):
+    """ convenience function to attach signal command to qpushbutton on creation
+
+    :param name: text to add to the button
+    :type name: string
+    :param command: python command to attach to the current button on clicked signal
+    :type command: <function>
+    :return: the button  
+    :rtype: QPushButton
+    """
+    button = pushButton()
+
+    button.setText(name)
+    button.setObjectName(name)
+
+    button.clicked.connect(command)
+    button.setMinimumHeight(23)
+    return button
 
 
 def FalseFolderCharacters(inString):
@@ -227,3 +294,36 @@ def setProgress(inValue, progressBar=None, inText=''):
     progressBar.message = inText
     progressBar.setValue(inValue)
     QApplication.processEvents()
+
+
+class LineEdit(QLineEdit):
+    """override the focus steal on the lineedit"""
+    allowText = pyqtSignal(bool)
+
+    def __init__(self, folderSpecific=True, *args):
+        super(LineEdit, self).__init__(*args)
+        self.__qt_normal_color = QPalette(self.palette()).color(QPalette.Base)
+
+        if folderSpecific:
+            self.textChanged[unicode].connect(self._checkString)
+
+    def __lineEdit_Color(self, inColor):
+        PalleteColor = QPalette(self.palette())
+        PalleteColor.setColor(QPalette.Base, QColor(inColor))
+        self.setPalette(PalleteColor)
+
+    def _checkString(self):
+        _curText = self.displayText()
+        if FalseFolderCharacters(_curText) != None:
+            self.__lineEdit_Color('red')
+            self.allowText.emit(False)
+        else:
+            self.__lineEdit_Color(self.__qt_normal_color)
+            self.allowText.emit(True)
+
+    def keyPressEvent(self, event):
+        key = event.key()
+        if key == Qt.Key.Key_Control or key == Qt.Key.Key_Shift:
+            return
+        else:
+            super(self.__class__, self).keyPressEvent(event)
