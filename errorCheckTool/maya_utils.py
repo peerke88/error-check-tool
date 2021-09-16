@@ -1,5 +1,5 @@
 from maya import cmds, mel
-from qt_util import *
+from errorCheckTool.qt_util import *
 
 
 def history_objects(uniqueGeometryList, allShapes, progressBar=None):

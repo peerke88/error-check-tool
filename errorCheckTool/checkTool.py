@@ -1,13 +1,13 @@
 from errorCheckTool.py23 import *
 from errorCheckTool.qt_util import *
 
-import os, re, stat, shutil, platform, logging, tempfile, glob, warnings, webbrowser
+import os
 from functools import partial
 from maya import cmds
 
 from errorCheckTool import mayaWidget
 from errorCheckTool.maya_utils import *
-from messageProgressBar import MessageProgressBar
+from errorCheckTool.messageProgressBar import MessageProgressBar
 __VERSION__ = "3.0.20210916"
 _DIR = os.path.dirname(__file__)
 

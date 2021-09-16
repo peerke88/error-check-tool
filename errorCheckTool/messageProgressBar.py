@@ -1,4 +1,4 @@
-from qt_util import *
+from errorCheckTool.qt_util import *
 
 
 class MessageProgressBar(QProgressBar):
